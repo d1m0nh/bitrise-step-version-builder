@@ -1,5 +1,3 @@
 .bitrise*
 .gows.user.yml
 .idea/*
-.vendor/*
-/vendor/

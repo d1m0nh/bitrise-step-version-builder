@@ -2,12 +2,11 @@ package main
 
 import (
 	"fmt"
+	"github.com/bitrise-io/go-steputils/stepconf"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
-
-	"github.com/bitrise-io/go-steputils/stepconf"
 )
 
 type config struct {
