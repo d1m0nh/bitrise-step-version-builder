@@ -138,6 +138,9 @@ func incrementVersion(name string, platform string, bump string) (app *applicati
 
 func getBasicAuth() string {
 	data := fmt.Sprintf("%s:%s", os.Getenv("VERSION_BUILDER_API_USERNAME"), os.Getenv("VERSION_BUILDER_API_SECRET"))
+	fmt.Println(os.Getenv("VERSION_BUILDER_API_URL"))
+	fmt.Println(data)
+
 	sEnc := base64.StdEncoding.EncodeToString([]byte(data))
 	return fmt.Sprintf("Basic %s", sEnc)
 }
