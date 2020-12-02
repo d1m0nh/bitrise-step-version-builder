@@ -54,16 +54,34 @@ toolkit:
 
 
 inputs:
-  - version_name: Current version name of the application
+  - version_builder_api_url: $SECRET_VERSION_BUILDER_API_URL
     opts:
-      title: "versionName"
+      title: "Version Builder API URL"
+      is_sensitive: true
+  - version_builder_api_username: $SECRET_VERSION_BUILDER_API_USERNAME
+    opts:
+      title: "Version Builder API username"
+      is_sensitive: true
+  - version_builder_api_secret: $SECRET_VERSION_BUILDER_API_SECRET
+    opts:
+      title: "Version Builder API secret"
+      is_sensitive: true
+  - app_name: Name of the application
+    opts:
+      title: "appName"
       summary: |-
-        Version name to change.
-        For example: 1.0.0
+        For example: youtube
 
       description: |
-        Version name to change.
-        For example: 1.0.0
+        App name for which to increment versions.
+  - platform: Platform name of the application
+    opts:
+      title: "platform"
+      summary: |-
+        For example: android
+
+      description: |
+        Platform for which to increment versions.
   - bump: Bump method
     opts:
       title: "bump"
@@ -81,3 +99,6 @@ outputs:
   - VERSION_NAME:
     opts:
       title: Final versionName
+  - BITRISE_BUILD_NUMBER:
+    opts:
+      title: Final build number

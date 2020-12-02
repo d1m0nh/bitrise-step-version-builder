@@ -1,17 +1,35 @@
 package main
 
 import (
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"github.com/bitrise-io/go-steputils/stepconf"
+	"io/ioutil"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
-	"strconv"
-	"strings"
 )
 
 type config struct {
-	VersionName *string `env:"version_name"`
-	Bump    	*string `env:"bump"`
+	AppName  *string `env:"app_name"`
+	Platform *string `env:"platform"`
+	Bump     *string `env:"bump"`
+}
+
+type application struct {
+	Name     string
+	Bundle   string
+	Platform string
+	Version  string
+	Build    int32
+}
+
+func failf(format string, v ...interface{}) {
+	fmt.Errorf(format, v...)
+	os.Exit(1)
 }
 
 func main() {
@@ -22,8 +40,12 @@ func main() {
 	stepconf.Print(cfg)
 	fmt.Println()
 
-	if cfg.VersionName == nil {
-		fmt.Println("VersionName not provided, however this is required.")
+	if cfg.AppName == nil {
+		failf("AppName not provided, however this is required.")
+	}
+
+	if cfg.Platform == nil {
+		failf("Platform not provided, however this is required.")
 	}
 
 	bump := "patch"
@@ -35,10 +57,16 @@ func main() {
 		fmt.Println("Bump should be patch or minor")
 	}
 
-	version, err := incrementVersion(*cfg.VersionName, bump)
-	fmt.Println(fmt.Sprintf("New version %s", version))
+	app, err := incrementVersion(*cfg.AppName, *cfg.Platform, bump)
+	fmt.Println(fmt.Sprintf("Version: %s Build: %d", app.Version, app.Build))
 
-	cmdLog, err := exec.Command("bitrise", "envman", "add", "--key", "VERSION_NAME", "--value", version).CombinedOutput()
+	cmdLog, err := exec.Command("bitrise", "envman", "add", "--key", "VERSION_NAME", "--value", app.Version).CombinedOutput()
+	if err != nil {
+		fmt.Printf("Failed to expose output with envman, error: %#v | output: %s", err, cmdLog)
+		os.Exit(1)
+	}
+
+	cmdLog, err = exec.Command("bitrise", "envman", "add", "--key", "BITRISE_BUILD_NUMBER", "--value", fmt.Sprintf("%d", app.Build)).CombinedOutput()
 	if err != nil {
 		fmt.Printf("Failed to expose output with envman, error: %#v | output: %s", err, cmdLog)
 		os.Exit(1)
@@ -47,50 +75,69 @@ func main() {
 	os.Exit(0)
 }
 
-func incrementVersion(version string, bump string) (ver string, err error) {
-	if bump == "minor" {
-		ver, err = incrementMinor(version)
-	} else {
-		ver, err = incrementPatch(version)
+func incrementVersion(name string, platform string, bump string) (app *application, err error) {
+	type increment struct {
+		Name     string `json:"name"`
+		Platform string `json:"platform"`
+		Bump     string `json:"bump"`
 	}
 
-	return ver, nil
+	var inc = increment{
+		Name:     name,
+		Platform: platform,
+		Bump:     bump,
+	}
+
+	incrementURL, err := url.Parse(fmt.Sprintf("%s/version/increment", os.Getenv("VERSION_BUILDER_API_URL")))
+	if err != nil {
+		failf("Could not build increment url")
+	}
+
+	body, err := json.Marshal(inc)
+	if err != nil {
+		failf("Could not create serialize increment body")
+	}
+
+	reqBody := ioutil.NopCloser(bytes.NewBuffer(body))
+	basic := getBasicAuth()
+
+	req := &http.Request{
+		Method: http.MethodPut,
+		URL:    incrementURL,
+		Header: map[string][]string{
+			"Content-Type":  {"application/json; charset=utf-8"},
+			"Authorization": {basic},
+		},
+		Body: reqBody,
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		failf("Call /version/increment failed %s", err.Error())
+	}
+
+	defer func() {
+		if err = resp.Body.Close(); err != nil {
+			failf("Could not close response body %s", err.Error())
+		}
+	}()
+
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		failf("Could not read response body %s", err.Error())
+	}
+
+	app = &application{}
+	err = json.Unmarshal(bodyBytes, app)
+	if err != nil {
+		failf("Could not parse response body %s", err.Error())
+	}
+
+	return app, nil
 }
 
-func incrementMinor(version string) (string, error) {
-	splitted := strings.Split(version, ".")
-	major, err := strconv.Atoi(splitted[0])
-	if err != nil {
-		return version, err
-	}
-
-	minor, err := strconv.Atoi(splitted[1])
-	if err != nil {
-		return version, err
-	}
-
-	minor++
-	return fmt.Sprintf("%v.%v.%v", major, minor, 0), nil
+func getBasicAuth() string {
+	data := fmt.Sprintf("%s:%s", os.Getenv("VERSION_BUILDER_API_USERNAME"), os.Getenv("VERSION_BUILDER_API_SECRET"))
+	sEnc := base64.StdEncoding.EncodeToString([]byte(data))
+	return fmt.Sprintf("Basic %s", sEnc)
 }
-
-func incrementPatch(version string) (string, error) {
-	splitted := strings.Split(version, ".")
-	major, err := strconv.Atoi(splitted[0])
-	if err != nil {
-		return version, err
-	}
-	minor, err := strconv.Atoi(splitted[1])
-	if err != nil {
-		return version, err
-	}
-
-	patch,err := strconv.Atoi(splitted[2])
-	if err != nil {
-		return version, err
-	}
-
-	patch++
-	return fmt.Sprintf("%v.%v.%v", major, minor, patch), nil
-}
-
-
