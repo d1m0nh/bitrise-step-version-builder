@@ -54,15 +54,15 @@ toolkit:
 
 
 inputs:
-  - version_builder_api_url: $SECRET_VERSION_BUILDER_API_URL
+  - version_builder_api_url: $VERSION_BUILDER_API_URL
     opts:
       title: "Version Builder API URL"
       is_sensitive: true
-  - version_builder_api_username: $SECRET_VERSION_BUILDER_API_USERNAME
+  - version_builder_api_username: $VERSION_BUILDER_API_USERNAME
     opts:
       title: "Version Builder API username"
       is_sensitive: true
-  - version_builder_api_secret: $SECRET_VERSION_BUILDER_API_SECRET
+  - version_builder_api_secret: $VERSION_BUILDER_API_SECRET
     opts:
       title: "Version Builder API secret"
       is_sensitive: true
